@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Gestão de Veículos</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .splash-container {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      background: var(--primary-color);
+      color: #fff;
+    }
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid var(--secondary-color);
+      border-radius: 50%;
+      width: 48px;
+      height: 48px;
+      animation: spin 1s linear infinite;
+      margin-bottom: 20px;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .splash-title {
+      font-size: 2rem;
+      font-weight: bold;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+    .splash-desc {
+      font-size: 1.1rem;
+      opacity: 0.8;
+    }
+  </style>
+
+  <!-- Firebase Modular SDK via CDN -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js";
+    import { getAuth, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDKyfzvvy3vwXvmy2t_g2D2nLDR9Nm1x2I",
+      authDomain: "gerenciamento-veiculos-6df88.firebaseapp.com",
+      projectId: "gerenciamento-veiculos-6df88",
+      storageBucket: "gerenciamento-veiculos-6df88.appspot.com",
+      messagingSenderId: "636653603303",
+      appId: "1:636653603303:web:e03e445d48fb87ee6f1542"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    onAuthStateChanged(auth, user => {
+      if (user) {
+        window.location.href = 'veiculos.html';
+      } else {
+        window.location.href = 'login.html';
+      }
+    });
+  </script>
+</head>
+<body>
+  <div class="splash-container">
+    <div class="spinner"></div>
+    <div class="splash-title">Gestão de Veículos</div>
+    <div class="splash-desc">Carregando, aguarde...</div>
+  </div>
+</body>
+</html>

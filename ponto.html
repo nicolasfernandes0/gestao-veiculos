@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ponto - Gestão de Veículos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html">Veículos</a></li>
+          <li><a href="manutencoes.html">Manutenções</a></li>
+          <li><a href="ponto.html" class="active">Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2>Registro de Ponto</h2>
+      <div id="relogio">00:00:00</div>
+    </div>
+
+    <div class="card">
+      <div class="ponto-actions">
+        <button id="btn-entrada" class="btn btn-primary">Registrar Entrada</button>
+        <button id="btn-saida" class="btn btn-secondary">Registrar Saída</button>
+      </div>
+
+      <div class="form-group">
+        <label for="observacao">Observação (opcional)</label>
+        <textarea id="observacao" rows="2"></textarea>
+      </div>
+
+      <div id="mensagem" class="mensagem"></div>
+    </div>
+
+    <div class="card">
+      <h3>Meus Registros</h3>
+      <div class="filtros">
+        <input type="date" id="data-inicio">
+        <input type="date" id="data-fim">
+        <button id="btn-filtrar" class="btn btn-sm">Filtrar</button>
+        <button id="btn-csv" class="btn btn-sm">Baixar CSV</button>
+        <button id="btn-pdf" class="btn btn-sm">Baixar PDF</button>
+      </div>
+      
+      <table id="registros-ponto">
+        <thead>
+          <tr>
+            <th>Data/Hora</th>
+            <th>Tipo</th>
+            <th>Veículo</th>
+            <th>Observação</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dados serão carregados via JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { logout, getCurrentUserInfo } from './js/auth.js';
+    import { registrarPonto, getPontosMotorista } from './js/ponto.js';
+    import { listarVeiculos } from './js/veiculos.js';
+
+    // Elementos DOM
+    const btnEntrada = document.getElementById('btn-entrada');
+    const btnSaida = document.getElementById('btn-saida');
+    const btnFiltrar = document.getElementById('btn-filtrar');
+    const observacao = document.getElementById('observacao');
+    const mensagem = document.getElementById('mensagem');
+    const registrosTable = document.querySelector('#registros-ponto tbody');
+    const relogio = document.getElementById('relogio');
+
+    // Atualiza relógio em tempo real
+    function atualizarRelogio() {
+      const agora = new Date();
+      relogio.textContent = agora.toLocaleTimeString();
+    }
+    setInterval(atualizarRelogio, 1000);
+    atualizarRelogio();
+
+    // Obter localização (se permitido pelo usuário)
+    async function getLocalizacao() {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            resolve({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude
+            });
+          },
+          () => resolve(null)
+        );
+      });
+    }
+
+    // Registrar ponto
+    async function registrarPontoUsuario(tipo) {
+      try {
+        const usuario = await getCurrentUserInfo();
+        if (!usuario) {
+          window.location.href = 'login.html';
+          return;
+        }
+
+        mensagem.textContent = 'Registrando...';
+        mensagem.className = 'mensagem info';
+
+        const localizacao = await getLocalizacao();
+        const obs = observacao.value.trim();
+
+        await registrarPonto(
+          usuario.uid,
+          tipo,
+          localizacao,
+          null, // Pode implementar seleção de veículo se necessário
+          obs
+        );
+
+        mensagem.textContent = `Ponto de ${tipo} registrado com sucesso!`;
+        mensagem.className = 'mensagem success';
+        observacao.value = '';
+        carregarRegistros();
+      } catch (error) {
+        mensagem.textContent = `Erro: ${error.message}`;
+        mensagem.className = 'mensagem error';
+        console.error('Erro ao registrar ponto:', error);
+      }
+    }
+
+    // Função para exportar CSV
+    function exportarCSV(registros) {
+      const header = ['Data/Hora', 'Tipo', 'Veículo', 'Observação'];
+      const rows = registros.map(registro => [
+        registro.data.toDate().toLocaleString(),
+        registro.tipo === 'entrada' ? 'Entrada' : 'Saída',
+        registro.veiculoId || '-',
+        registro.observacao || '-'
+      ]);
+      const csvContent = [header, ...rows].map(e => e.map(v => `"${v}"`).join(',')).join('\n');
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'registros_ponto.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    // Função para exportar PDF (usando jsPDF)
+    async function exportarPDF(registros) {
+      // Carrega jsPDF dinamicamente se não estiver disponível
+      if (typeof window.jspdf === 'undefined') {
+        await import('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      }
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF();
+      doc.text('Registros de Ponto', 10, 10);
+      let y = 20;
+      doc.setFontSize(10);
+      doc.text('Data/Hora', 10, y);
+      doc.text('Tipo', 60, y);
+      doc.text('Veículo', 90, y);
+      doc.text('Observação', 120, y);
+      y += 6;
+      registros.forEach(registro => {
+        doc.text(registro.data.toDate().toLocaleString(), 10, y);
+        doc.text(registro.tipo === 'entrada' ? 'Entrada' : 'Saída', 60, y);
+        doc.text(registro.veiculoId || '-', 90, y);
+        doc.text((registro.observacao || '-').substring(0, 40), 120, y);
+        y += 6;
+        if (y > 280) {
+          doc.addPage();
+          y = 20;
+        }
+      });
+      doc.save('registros_ponto.pdf');
+    }
+
+    // Variável para armazenar os registros carregados
+    let registrosCarregados = [];
+
+    // Carregar registros
+    async function carregarRegistros() {
+      try {
+        const usuario = await getCurrentUserInfo();
+        if (!usuario) return;
+
+        const dataInicio = document.getElementById('data-inicio').value;
+        const dataFim = document.getElementById('data-fim').value;
+
+        const registros = await getPontosMotorista(
+          usuario.uid,
+          dataInicio,
+          dataFim
+        );
+
+        registrosCarregados = registros; // Salva para exportação
+
+        registrosTable.innerHTML = registros.map(registro => `
+          <tr>
+            <td>${registro.data.toDate().toLocaleString()}</td>
+            <td>
+              <span class="tipo-ponto ${registro.tipo}">
+                ${registro.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+              </span>
+            </td>
+            <td>${registro.veiculoId || '-'}</td>
+            <td>${registro.observacao || '-'}</td>
+          </tr>
+        `).join('');
+      } catch (error) {
+        console.error('Erro ao carregar registros:', error);
+      }
+    }
+
+    // Event Listeners
+    btnEntrada.addEventListener('click', () => registrarPontoUsuario('entrada'));
+    btnSaida.addEventListener('click', () => registrarPontoUsuario('saida'));
+    btnFiltrar.addEventListener('click', carregarRegistros);
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await logout();
+        window.location.href = 'index.html';
+      } catch (error) {
+        console.error('Erro no logout:', error);
+      }
+    });
+
+    // Botões de exportação
+    document.getElementById('btn-csv').addEventListener('click', () => {
+      if (registrosCarregados.length === 0) {
+        alert('Nenhum registro para exportar.');
+        return;
+      }
+      exportarCSV(registrosCarregados);
+    });
+
+    document.getElementById('btn-pdf').addEventListener('click', () => {
+      if (registrosCarregados.length === 0) {
+        alert('Nenhum registro para exportar.');
+        return;
+      }
+      exportarPDF(registrosCarregados);
+    });
+
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', () => {
+      // Define datas padrão (hoje e 7 dias atrás)
+      const hoje = new Date().toISOString().split('T')[0];
+      const seteDiasAtras = new Date();
+      seteDiasAtras.setDate(seteDiasAtras.getDate() - 7);
+      const seteDiasAtrasStr = seteDiasAtras.toISOString().split('T')[0];
+
+      document.getElementById('data-inicio').value = seteDiasAtrasStr;
+      document.getElementById('data-fim').value = hoje;
+
+      carregarRegistros();
+    });
+  </script>
+
+  <style>
+    /* Estilos específicos para a página de ponto */
+    .ponto-actions {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+    }
+
+    .tipo-ponto {
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-weight: bold;
+      color: white;
+    }
+
+    .tipo-ponto.entrada {
+      background-color: #28a745;
+    }
+
+    .tipo-ponto.saida {
+      background-color: #dc3545;
+    }
+
+    .filtros {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 15px;
+      align-items: center;
+    }
+
+    .filtros input {
+      padding: 8px;
+    }
+
+    #relogio {
+      font-size: 1.5rem;
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+
+    .mensagem {
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 4px;
+    }
+
+    .mensagem.info {
+      background-color: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .mensagem.success {
+      background-color: #d4edda;
+      color: #155724;
+    }
+
+    .mensagem.error {
+      background-color: #f8d7da;
+      color: #721c24;
+    }
+  </style>
+</body>
+</html>

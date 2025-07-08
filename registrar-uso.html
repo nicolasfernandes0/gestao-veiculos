@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Registrar Uso - Gestão de Veículos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html" class="active">Veículos</a></li>
+          <li><a href="manutencoes.html" >Manutenções</a></li>
+          <li><a href="ponto.html" >Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2>Registrar Uso do Veículo</h2>
+      <a href="veiculos.html" class="btn">Voltar</a>
+    </div>
+
+    <div class="card">
+      <form id="registro-form">
+        <div class="form-group">
+          <label for="data-inicio">Data e Hora de Início</label>
+          <input type="datetime-local" id="data-inicio" required>
+        </div>
+        <div class="form-group">
+          <label for="quilometragem">Quilometragem Atual</label>
+          <input type="number" id="quilometragem" step="0.1" required>
+        </div>
+        <div class="form-group">
+          <label for="finalidade">Finalidade do Uso</label>
+          <textarea id="finalidade" required></textarea>
+        </div>
+        <button type="submit" class="btn">Registrar Uso</button>
+      </form>
+    </div>
+  </main>
+
+  <script type="module">
+    import { logout } from './js/auth.js';
+    import { getCurrentUserInfo } from './js/auth.js';
+    import { registrarUso } from './js/registros.js';
+    import { getVeiculo } from './js/veiculos.js';
+    
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await logout();
+        window.location.href = 'login.html';
+      } catch (error) {
+        console.error('Erro no logout:', error);
+      }
+    });
+    
+    // Obtém IDs da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const veiculoId = urlParams.get('veiculo');
+    
+    // Carrega dados do veículo
+    async function carregarDados() {
+      try {
+        const veiculo = await getVeiculo(veiculoId);
+        const usuario = await getCurrentUserInfo();
+        
+        if (!veiculo || !usuario) {
+          window.location.href = 'veiculos.html';
+        }
+      } catch (error) {
+        console.error('Erro ao carregar dados:', error);
+      }
+    }
+    
+    // Formulário de registro
+    document.getElementById('registro-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const dataInicio = document.getElementById('data-inicio').value;
+      const quilometragem = document.getElementById('quilometragem').value;
+      const finalidade = document.getElementById('finalidade').value;
+      
+      try {
+        const usuario = await getCurrentUserInfo();
+        await registrarUso(veiculoId, usuario.uid, dataInicio, quilometragem, finalidade);
+        alert('Uso registrado com sucesso!');
+        window.location.href = 'veiculos.html';
+      } catch (error) {
+        console.error('Erro ao registrar uso:', error);
+        alert('Erro: ' + error.message);
+      }
+    });
+    
+    // Inicializa a página
+    carregarDados();
+  </script>
+</body>
+</html>

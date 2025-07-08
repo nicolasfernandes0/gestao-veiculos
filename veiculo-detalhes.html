@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalhes do Veículo</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html" class="active">Veículos</a></li>
+          <li><a href="manutencoes.html" >Manutenções</a></li>
+          <li><a href="ponto.html" >Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2 id="veiculo-titulo">Detalhes do Veículo</h2>
+      <a href="veiculos.html" class="btn">Voltar</a>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Informações</h3>
+        <div id="veiculo-info">
+          <!-- Dados serão carregados via JavaScript -->
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Foto Principal</h3>
+        <div id="foto-principal-container">
+          <img id="foto-principal" class="veiculo-foto">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Adicionar Foto</h3>
+      <form id="upload-form">
+        <input type="file" id="foto-input" accept="image/*" required>
+        <input type="text" id="foto-descricao" placeholder="Descrição (opcional)">
+        <button type="submit" class="btn">Enviar Foto</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h3>Histórico de Uso</h3>
+      <table id="historico-table">
+        <thead>
+          <tr>
+            <th>Data</th>
+            <th>Motorista</th>
+            <th>Quilometragem</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dados serão carregados via JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { logout } from './js/auth.js';
+    import { getVeiculo, getFotosVeiculo, uploadFotoVeiculo } from './js/veiculos.js';
+    import { listarRegistrosUso } from './js/registros.js';
+    
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await logout();
+        window.location.href = 'index.html';
+      } catch (error) {
+        console.error('Erro no logout:', error);
+      }
+    });
+    
+    // Obtém ID do veículo da URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const veiculoId = urlParams.get('id');
+    
+    // Carrega dados do veículo
+    async function carregarVeiculo() {
+      try {
+        const veiculo = await getVeiculo(veiculoId);
+        
+        document.getElementById('veiculo-titulo').textContent = 
+          `${veiculo.marca} ${veiculo.modelo} - ${veiculo.placa}`;
+        
+        document.getElementById('veiculo-info').innerHTML = `
+          <p><strong>Placa:</strong> ${veiculo.placa}</p>
+          <p><strong>Marca/Modelo:</strong> ${veiculo.marca} ${veiculo.modelo}</p>
+          <p><strong>Ano:</strong> ${veiculo.ano}</p>
+          <p><strong>Quilometragem:</strong> ${veiculo.quilometragem} km</p>
+          <p><strong>Status:</strong> <span class="status ${veiculo.status}">${veiculo.status}</span></p>
+        `;
+        
+        if (veiculo.fotoPrincipal) {
+          document.getElementById('foto-principal').src = veiculo.fotoPrincipal;
+        } else {
+          document.getElementById('foto-principal-container').innerHTML = 
+            '<p>Nenhuma foto principal cadastrada</p>';
+        }
+        
+        // Carrega histórico
+        const registros = await listarRegistrosUso(veiculoId);
+        const tbody = document.querySelector('#historico-table tbody');
+        
+        tbody.innerHTML = registros.map(registro => `
+          <tr>
+            <td>${new Date(registro.dataInicio.seconds * 1000).toLocaleDateString()}</td>
+            <td>${registro.usuarioId}</td>
+            <td>${registro.quilometragemInicial} km</td>
+          </tr>
+        `).join('');
+      } catch (error) {
+        console.error('Erro ao carregar veículo:', error);
+      }
+    }
+    
+    // Upload de foto
+    document.getElementById('upload-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const fileInput = document.getElementById('foto-input');
+      const descricao = document.getElementById('foto-descricao').value;
+      
+      if (fileInput.files.length > 0) {
+        try {
+          await uploadFotoVeiculo(veiculoId, fileInput.files[0], descricao);
+          alert('Foto enviada com sucesso!');
+          carregarVeiculo(); // Recarrega os dados
+        } catch (error) {
+          console.error('Erro no upload:', error);
+        }
+      }
+    });
+    
+    // Inicializa a página
+    carregarVeiculo();
+  </script>
+</body>
+</html>

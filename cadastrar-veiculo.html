@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cadastrar Veículo - Gestão de Veículos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html" class="active">Veículos</a></li>
+          <li><a href="manutencoes.html" >Manutenções</a></li>
+	        <li><a href="ponto.html">Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2>Cadastrar Novo Veículo</h2>
+      <a href="veiculos.html" class="btn">Voltar</a>
+    </div>
+
+    <div class="card">
+      <form id="veiculo-form">
+        <div class="form-group">
+          <label for="placa">Placa</label>
+          <input type="text" id="placa" required>
+        </div>
+        <div class="form-group">
+          <label for="marca">Marca</label>
+          <input type="text" id="marca" required>
+        </div>
+        <div class="form-group">
+          <label for="modelo">Modelo</label>
+          <input type="text" id="modelo" required>
+        </div>
+        <div class="form-group">
+          <label for="ano">Ano</label>
+          <input type="number" id="ano" required>
+        </div>
+        <div class="form-group">
+          <label for="tipo">Tipo</label>
+          <select id="tipo" required>
+            <option value="carro">Carro</option>
+            <option value="caminhao">Caminhão</option>
+            <option value="moto">Moto</option>
+          </select>
+        </div>
+        <button type="submit" class="btn">Cadastrar</button>
+      </form>
+    </div>
+  </main>
+
+  <script type="module">
+    import { logout } from './js/auth.js';
+    import { cadastrarVeiculo } from './js/veiculos.js';
+    
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await logout();
+        window.location.href = 'index.html';
+      } catch (error) {
+        console.error('Erro no logout:', error);
+      }
+    });
+    
+    // Formulário de cadastro
+    document.getElementById('veiculo-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      
+      const placa = document.getElementById('placa').value;
+      const marca = document.getElementById('marca').value;
+      const modelo = document.getElementById('modelo').value;
+      const ano = document.getElementById('ano').value;
+      const tipo = document.getElementById('tipo').value;
+      
+      try {
+        await cadastrarVeiculo(placa, marca, modelo, ano, tipo);
+        alert('Veículo cadastrado com sucesso!');
+        window.location.href = 'veiculos.html';
+      } catch (error) {
+        console.error('Erro ao cadastrar veículo:', error);
+        alert('Erro: ' + error.message);
+      }
+    });
+  </script>
+</body>
+</html>

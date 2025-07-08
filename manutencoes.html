@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestão de Manutenções</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html">Veículos</a></li>
+          <li><a href="manutencoes.html" class="active">Manutenções</a></li>
+          <li><a href="ponto.html">Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2>Gestão de Manutenções</h2>
+      <div class="actions">
+        <button id="btn-nova-manutencao" class="btn">Nova Manutenção</button>
+        <input type="text" id="busca-manutencao" placeholder="Buscar manutenção...">
+      </div>
+    </div>
+
+    <div class="card">
+      <table id="tabela-manutencoes">
+        <thead>
+          <tr>
+            <th>Veículo</th>
+            <th>Tipo</th>
+            <th>Descrição</th>
+            <th>Início</th>
+            <th>Término</th>
+            <th>Custo (R$)</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dados serão carregados via JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Modal de Manutenção -->
+    <div id="modal-manutencao" class="modal">
+      <div class="modal-content">
+        <span class="close">&times;</span>
+        <h3 id="modal-titulo">Nova Manutenção</h3>
+        <form id="form-manutencao">
+          <input type="hidden" id="manutencao-id">
+          
+          <div class="form-group">
+            <label for="veiculo-id">Veículo</label>
+            <select id="veiculo-id" required>
+              <!-- Opções serão preenchidas via JS -->
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="tipo-manutencao">Tipo de Manutenção</label>
+            <select id="tipo-manutencao" required>
+              <option value="preventiva">Preventiva</option>
+              <option value="corretiva">Corretiva</option>
+              <option value="pintura">Pintura</option>
+              <option value="mecanica">Mecânica</option>
+              <option value="eletrica">Elétrica</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="descricao-manutencao">Descrição</label>
+            <textarea id="descricao-manutencao" rows="3" required></textarea>
+          </div>
+          
+          <div class="form-group">
+            <label for="data-inicio">Data de Início</label>
+            <input type="datetime-local" id="data-inicio" required>
+          </div>
+          
+          <div class="form-group">
+            <label for="data-fim">Data de Término (opcional)</label>
+            <input type="datetime-local" id="data-fim">
+          </div>
+          
+          <div class="form-group">
+            <label for="custo-manutencao">Custo (R$)</label>
+            <input type="number" id="custo-manutencao" step="0.01" min="0">
+          </div>
+          
+          <button type="submit" class="btn">Salvar</button>
+        </form>
+      </div>
+    </div>
+
+    <script type="module">
+      import { logout, getCurrentUserInfo, monitorarEstadoAuth } from '../js/auth.js';
+      import { listarManutencoes, registrarManutencao, finalizarManutencao } from '../js/manutencoes.js';
+      import { listarVeiculos } from '../js/veiculos.js';
+
+      // Elementos DOM
+      const modal = document.getElementById("modal-manutencao");
+      const btnNova = document.getElementById("btn-nova-manutencao");
+      const btnClose = document.querySelector(".close");
+      const formManutencao = document.getElementById("form-manutencao");
+      const tabelaManutencoes = document.querySelector("#tabela-manutencoes tbody");
+      const buscaInput = document.getElementById("busca-manutencao");
+      const selectVeiculos = document.getElementById("veiculo-id");
+
+      // Carregar veículos para o select
+      async function carregarVeiculos() {
+        try {
+          const veiculos = await listarVeiculos();
+          selectVeiculos.innerHTML = veiculos
+            .filter(v => v.status === 'disponivel' || v.status === 'manutencao')
+            .map(v => `<option value="${v.id}">${v.placa} - ${v.modelo}</option>`)
+            .join('');
+        } catch (error) {
+          console.error("Erro ao carregar veículos:", error);
+        }
+      }
+
+      // Carregar manutenções na tabela
+      async function carregarManutencoes() {
+        try {
+          tabelaManutencoes.innerHTML = '<tr><td colspan="8">Carregando...</td></tr>';
+          
+          const manutencoes = await listarManutencoes();
+          
+          if (manutencoes.length === 0) {
+            tabelaManutencoes.innerHTML = '<tr><td colspan="8">Nenhuma manutenção registrada</td></tr>';
+            return;
+          }
+          
+          tabelaManutencoes.innerHTML = manutencoes.map(manutencao => `
+            <tr>
+              <td>${manutencao.veiculoId}</td>
+              <td>${manutencao.tipo}</td>
+              <td>${manutencao.descricao}</td>
+              <td>${formatarData(manutencao.dataInicio)}</td>
+              <td>${manutencao.dataFim ? formatarData(manutencao.dataFim) : '-'}</td>
+              <td>R$ ${manutencao.custo?.toFixed(2) || '0.00'}</td>
+              <td><span class="status ${manutencao.status}">${manutencao.status}</span></td>
+              <td>
+                ${manutencao.status !== 'concluida' ? 
+                  `<button class="btn-finalizar" data-id="${manutencao.id}">Finalizar</button>` : ''}
+              </td>
+            </tr>
+          `).join('');
+          
+          // Adicionar eventos aos botões de finalizar
+          document.querySelectorAll('.btn-finalizar').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+              const manutencaoId = e.target.dataset.id;
+              const dataFim = prompt("Informe a data/hora de término (YYYY-MM-DD HH:MM):");
+              if (dataFim) {
+                try {
+                  await finalizarManutencao(manutencaoId, dataFim);
+                  alert("Manutenção finalizada com sucesso!");
+                  await carregarManutencoes();
+                } catch (error) {
+                  alert("Erro ao finalizar manutenção: " + error.message);
+                }
+              }
+            });
+          });
+        } catch (error) {
+          console.error("Erro ao carregar manutenções:", error);
+          tabelaManutencoes.innerHTML = `<tr><td colspan="8">Erro ao carregar: ${error.message}</td></tr>`;
+        }
+      }
+
+      // Formatador de data
+      function formatarData(data) {
+        if (!data) return '-';
+        return new Date(data).toLocaleString('pt-BR');
+      }
+
+      // Evento para nova manutenção
+      btnNova.addEventListener('click', () => {
+        document.getElementById('modal-titulo').textContent = 'Nova Manutenção';
+        formManutencao.reset();
+        modal.style.display = 'block';
+      });
+
+      // Fechar modal
+      btnClose.addEventListener('click', () => {
+        modal.style.display = 'none';
+      });
+
+      // Submit do formulário
+      formManutencao.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        try {
+          const veiculoId = document.getElementById('veiculo-id').value;
+          const tipo = document.getElementById('tipo-manutencao').value;
+          const descricao = document.getElementById('descricao-manutencao').value;
+          const dataInicio = document.getElementById('data-inicio').value;
+          const dataFim = document.getElementById('data-fim').value || null;
+          const custo = document.getElementById('custo-manutencao').value || 0;
+          
+          await registrarManutencao(veiculoId, tipo, descricao, dataInicio, dataFim, custo);
+          
+          alert("Manutenção registrada com sucesso!");
+          modal.style.display = 'none';
+          await carregarManutencoes();
+        } catch (error) {
+          alert("Erro ao registrar manutenção: " + error.message);
+        }
+      });
+
+      // Logout
+      document.getElementById("logout-btn").addEventListener("click", async () => {
+        try {
+          await logout();
+          window.location.href = "index.html";
+        } catch (error) {
+          console.error("Erro no logout:", error);
+        }
+      });
+    </script>
+
+    <style>
+      /* Estilos específicos para esta página */
+      .actions {
+        display: flex;
+        gap: 10px;
+      }
+
+      #busca-manutencao {
+        padding: 8px 12px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        flex-grow: 1;
+      }
+
+      .status {
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-weight: bold;
+        text-transform: capitalize;
+      }
+
+      .status.agendada {
+        background-color: #fff3cd;
+        color: #856404;
+      }
+
+      .status.em_andamento {
+        background-color: #cce5ff;
+        color: #004085;
+      }
+
+      .status.concluida {
+        background-color: #d4edda;
+        color: #155724;
+      }
+
+      .btn-finalizar {
+        background-color: #28a745;
+        color: white;
+        border: none;
+        padding: 5px 10px;
+        border-radius: 4px;
+        cursor: pointer;
+      }
+
+      .btn-finalizar:hover {
+        background-color: #218838;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0,0,0,0.4);
+      }
+
+      .modal-content {
+        background-color: #fefefe;
+        margin: 5% auto;
+        padding: 20px;
+        border: 1px solid #888;
+        width: 80%;
+        max-width: 600px;
+        border-radius: 8px;
+      }
+
+      .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+      }
+
+      .close:hover {
+        color: black;
+      }
+
+      .form-group {
+        margin-bottom: 15px;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 5px;
+        font-weight: bold;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #ddd;
+        border-radius: 4px;
+      }
+    </style>
+  </main>
+</body>
+</html>

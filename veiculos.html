@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Veículos - Gestão de Veículos</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <h1>Gestão de Veículos</h1>
+      <nav>
+        <ul>
+          <li><a href="veiculos.html" class="active">Veículos</a></li>
+          <li><a href="manutencoes.html">Manutenções</a></li>
+          <li><a href="ponto.html">Ponto</a></li>
+          <li><a href="usuarios.html">Usuários</a></li>
+          <li><button id="logout-btn">Sair</button></li>
+        </ul>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="header-actions">
+      <h2>Veículos Cadastrados</h2>
+      <a href="cadastrar-veiculo.html" class="btn">Novo Veículo</a>
+    </div>
+
+    <div class="card">
+      <table id="veiculos-table">
+        <thead>
+          <tr>
+            <th>Foto</th>
+            <th>Placa</th>
+            <th>Modelo</th>
+            <th>Status</th>
+            <th>Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Dados serão carregados via JavaScript -->
+        </tbody>
+      </table>
+    </div>
+  </main>
+
+  <script type="module">
+    import { logout } from './js/auth.js';
+    import { listarVeiculos } from './js/veiculos.js';
+
+    // Logout
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      try {
+        await logout();
+        window.location.href = 'index.html';
+      } catch (error) {
+        console.error('Erro no logout:', error);
+      }
+    });
+
+    // Carrega veículos
+    async function carregarVeiculos() {
+      try {
+        const veiculos = await listarVeiculos();
+        const tbody = document.querySelector('#veiculos-table tbody');
+
+        tbody.innerHTML = veiculos.map(veiculo => `
+          <tr>
+            <td>
+              ${
+                veiculo.fotoPrincipal &&
+                typeof veiculo.fotoPrincipal === 'string' &&
+                veiculo.fotoPrincipal.startsWith('http')
+                  ? `<img src="${veiculo.fotoPrincipal}" alt="${veiculo.modelo}" class="veiculo-thumbnail">`
+                  : 'Sem foto'
+              }
+            </td>
+            <td>${veiculo.placa}</td>
+            <td>${veiculo.marca} ${veiculo.modelo}</td>
+            <td>
+              <span class="status ${veiculo.status}">${veiculo.status}</span>
+            </td>
+            <td>
+              <a href="veiculo-detalhes.html?id=${veiculo.id}" class="btn btn-sm">Detalhes</a>
+              <a href="registrar-uso.html?veiculo=${veiculo.id}" class="btn btn-sm btn-primary">Usar</a>
+            </td>
+          </tr>
+        `).join('');
+      } catch (error) {
+        console.error('Erro ao carregar veículos:', error);
+      }
+    }
+
+    // Inicializa a página
+    carregarVeiculos();
+  </script>
+</body>
+</html>
